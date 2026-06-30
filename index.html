@@ -23,6 +23,7 @@
 <body>
 
     <canvas id="gameCanvas" width="800" height="400"></canvas>
+
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
@@ -33,20 +34,26 @@
             y: 200,
             size: 20,
             color: "#00ffcc",
-            speed: 5 // How fast the player moves up/down
+            speed: 5
         };
 
-        // Track if the button/mouse is being pressed
+        // --- OBSTACLE CONFIGURATION ---
+        const obstacle = {
+            x: canvas.width,    // Start off-screen on the right
+            width: 50,          // Width of the obstacles
+            gap: 120,           // Size of the gap to fly through
+            gapY: 150,          // Vertical position of the gap
+            speed: 4,           // Speed moving left
+            color: "#ff0055"    // Neon pink color
+        };
+
         let isPressed = false;
 
         // --- INPUT LISTENERS ---
-        // Mouse/Touch controls
         window.addEventListener("mousedown", () => isPressed = true);
         window.addEventListener("mouseup", () => isPressed = false);
         window.addEventListener("touchstart", () => isPressed = true);
         window.addEventListener("touchend", () => isPressed = false);
-
-        // Keyboard controls (Spacebar)
         window.addEventListener("keydown", (e) => {
             if (e.code === "Space") isPressed = true;
         });
@@ -55,20 +62,40 @@
         });
 
         function updatePlayer() {
-            // If pressed, move UP. If not, move DOWN.
             if (isPressed) {
                 player.y -= player.speed;
             } else {
                 player.y += player.speed;
             }
 
-            // Prevent player from leaving the screen (boundaries)
-            if (player.y < player.size) {
-                player.y = player.size;
+            if (player.y < player.size) player.y = player.size;
+            if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
+        }
+
+        // --- UPDATE OBSTACLES ---
+        function updateObstacles() {
+            // Move obstacle to the left
+            obstacle.x -= obstacle.speed;
+
+            // If obstacle goes off-screen, reset it to the right with a new random gap position
+            if (obstacle.x + obstacle.width < 0) {
+                obstacle.x = canvas.width;
+                // Random gap height, keeping it away from the extreme edges
+                obstacle.gapY = Math.random() * (canvas.height - obstacle.gap - 100) + 50;
             }
-            if (player.y > canvas.height - player.size) {
-                player.y = canvas.height - player.size;
-            }
+        }
+
+        // --- DRAW OBSTACLES ---
+        function drawObstacles() {
+            ctx.fillStyle = obstacle.color;
+
+            // Top obstacle
+            ctx.fillRect(obstacle.x, 0, obstacle.width, obstacle.gapY);
+
+            // Bottom obstacle
+            const bottomObstacleY = obstacle.gapY + obstacle.gap;
+            const bottomObstacleHeight = canvas.height - bottomObstacleY;
+            ctx.fillRect(obstacle.x, bottomObstacleY, obstacle.width, bottomObstacleHeight);
         }
 
         function drawPlayer() {
@@ -82,21 +109,22 @@
         }
 
         function gameLoop() {
-            // Clear the screen
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Update positions
+            // Update
             updatePlayer();
+            updateObstacles();
 
-            // Draw everything
+            // Draw
+            drawObstacles();
             drawPlayer();
 
             requestAnimationFrame(gameLoop);
         }
 
-        // Start the game
         gameLoop();
     </script>
+
 
 </body>
 </html>
