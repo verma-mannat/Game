@@ -33,20 +33,24 @@
             y: 200,
             size: 20,
             color: "#00ffcc",
-            speed: 5 // How fast the player moves up/down
+            speed: 5
         };
+
+        // --- OBSTACLE MANAGEMENT ---
+        let obstacles = [];
+        let obstacleTimer = 0;
+        const obstacleSpawnRate = 90; // Spawn an obstacle roughly every 90 frames (~1.5 seconds)
+        const obstacleSpeed = 4;
 
         // Track if the button/mouse is being pressed
         let isPressed = false;
 
         // --- INPUT LISTENERS ---
-        // Mouse/Touch controls
         window.addEventListener("mousedown", () => isPressed = true);
         window.addEventListener("mouseup", () => isPressed = false);
         window.addEventListener("touchstart", () => isPressed = true);
         window.addEventListener("touchend", () => isPressed = false);
 
-        // Keyboard controls (Spacebar)
         window.addEventListener("keydown", (e) => {
             if (e.code === "Space") isPressed = true;
         });
@@ -54,23 +58,74 @@
             if (e.code === "Space") isPressed = false;
         });
 
-        function updatePlayer() {
-            // If pressed, move UP. If not, move DOWN.
+        // --- RESET FUNCTION ---
+        function resetGame() {
+            player.y = 200;
+            obstacles = [];
+            obstacleTimer = 0;
+            isPressed = false;
+        }
+
+        // --- UPDATE LOGIC ---
+        function updateGame() {
+            // 1. Move Player
             if (isPressed) {
                 player.y -= player.speed;
             } else {
                 player.y += player.speed;
             }
 
-            // Prevent player from leaving the screen (boundaries)
-            if (player.y < player.size) {
-                player.y = player.size;
+            // Boundaries
+            if (player.y < player.size) player.y = player.size;
+            if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
+
+            // 2. Handle Obstacles Spawning
+            obstacleTimer++;
+            if (obstacleTimer >= obstacleSpawnRate) {
+                // Generate a random height for the obstacle wall/pillar
+                let minHeight = 40;
+                let maxHeight = 200;
+                let height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+                
+                // Randomly choose if the obstacle spawns from the TOP or BOTTOM of the screen
+                let isTop = Math.random() < 0.5;
+                let yPosition = isTop ? 0 : canvas.height - height;
+
+                obstacles.push({
+                    x: canvas.width,
+                    y: yPosition,
+                    width: 30,
+                    height: height,
+                    color: "#ff4444" // Bright neon red/coral
+                });
+
+                obstacleTimer = 0; // Reset spawn timer
             }
-            if (player.y > canvas.height - player.size) {
-                player.y = canvas.height - player.size;
+
+            // 3. Move and Check Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= obstacleSpeed; // Move to the left
+
+                // Check collision with Player (Bounding box vs player coordinates approximation)
+                if (
+                    player.x + player.size > obs.x &&
+                    player.x < obs.x + obs.width &&
+                    player.y + player.size / 2 > obs.y &&
+                    player.y - player.size / 2 < obs.y + obs.height
+                ) {
+                    resetGame();
+                    return; // Stop updating this frame immediately on death
+                }
+
+                // Remove obstacle if it goes off-screen to save computer memory
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(i, 1);
+                }
             }
         }
 
+        // --- DRAW LOGIC ---
         function drawPlayer() {
             ctx.fillStyle = player.color;
             ctx.beginPath();
@@ -81,14 +136,22 @@
             ctx.fill();
         }
 
+        function drawObstacles() {
+            for (let obs of obstacles) {
+                ctx.fillStyle = obs.color;
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            }
+        }
+
+        // --- GAME LOOP ---
         function gameLoop() {
-            // Clear the screen
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Update positions
-            updatePlayer();
+            // Update data
+            updateGame();
 
-            // Draw everything
+            // Render visual frames
+            drawObstacles();
             drawPlayer();
 
             requestAnimationFrame(gameLoop);
