@@ -23,12 +23,12 @@
 <body>
 
     <canvas id="gameCanvas" width="800" height="400"></canvas>
-
-        <script>
+    <script>//mannat
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
         // --- PLAYER CONFIGURATION ---
+        
         const player = {
             x: 80,
             y: 200,
@@ -37,16 +37,19 @@
             speed: 5
         };
 
-        // --- OBSTACLE CONFIGURATION ---
-        const obstacle = {
-            x: canvas.width,    // Start off-screen on the right
-            width: 50,          // Width of the obstacles
-            gap: 120,           // Size of the gap to fly through
-            gapY: 150,          // Vertical position of the gap
-            speed: 4,           // Speed moving left
-            color: "#ff0055"    // Neon pink color
-        };
+        // --- OBSTACLE MANAGEMENT ---
+        let obstacles = [];
+        let obstacleTimer = 0;
+        const obstacleSpawnRate = 90; 
+        const obstacleSpeed = 4;
 
+        // --- SCORE SYSTEM ---
+        let currentScore = 0;
+        // Check if a high score was saved before; if not, start at 0
+        let highScore = localStorage.getItem("spaceWavesHighScore") ? parseInt(localStorage.getItem("spaceWavesHighScore")) : 0;
+        let scoreTimer = 0; // Used to increment score over time
+
+        // Track if the button/mouse is being pressed
         let isPressed = false;
 
         // --- INPUT LISTENERS ---
@@ -54,6 +57,7 @@
         window.addEventListener("mouseup", () => isPressed = false);
         window.addEventListener("touchstart", () => isPressed = true);
         window.addEventListener("touchend", () => isPressed = false);
+
         window.addEventListener("keydown", (e) => {
             if (e.code === "Space") isPressed = true;
         });
@@ -61,43 +65,86 @@
             if (e.code === "Space") isPressed = false;
         });
 
-        function updatePlayer() {
+        // --- RESET FUNCTION ---
+        function resetGame() {
+            // Check if current score beat the high score before resetting
+            if (currentScore > highScore) {
+                highScore = currentScore;
+                localStorage.setItem("spaceWavesHighScore", highScore); // Save to browser memory!
+            }
+
+            player.y = 200;
+            obstacles = [];
+            obstacleTimer = 0;
+            currentScore = 0; // Reset current score
+            scoreTimer = 0;
+            isPressed = false;
+        }
+
+        // --- UPDATE LOGIC ---
+        function updateGame() {
+            // 1. Move Player
             if (isPressed) {
                 player.y -= player.speed;
             } else {
                 player.y += player.speed;
             }
 
+            // Boundaries
             if (player.y < player.size) player.y = player.size;
             if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
-        }
 
-        // --- UPDATE OBSTACLES ---
-        function updateObstacles() {
-            // Move obstacle to the left
-            obstacle.x -= obstacle.speed;
+            // 2. Increment Score (Earn 1 point roughly every 10 frames (~0.16 seconds))
+            scoreTimer++;
+            if (scoreTimer >= 10) {
+                currentScore++;
+                scoreTimer = 0;
+            }
 
-            // If obstacle goes off-screen, reset it to the right with a new random gap position
-            if (obstacle.x + obstacle.width < 0) {
-                obstacle.x = canvas.width;
-                // Random gap height, keeping it away from the extreme edges
-                obstacle.gapY = Math.random() * (canvas.height - obstacle.gap - 100) + 50;
+            // 3. Handle Obstacles Spawning
+            obstacleTimer++;
+            if (obstacleTimer >= obstacleSpawnRate) {
+                let minHeight = 40;
+                let maxHeight = 200;
+                let height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+                
+                let isTop = Math.random() < 0.5;
+                let yPosition = isTop ? 0 : canvas.height - height;
+
+                obstacles.push({
+                    x: canvas.width,
+                    y: yPosition,
+                    width: 30,
+                    height: height,
+                    color: "#ff4444"
+                });
+
+                obstacleTimer = 0;
+            }
+
+            // 4. Move and Check Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= obstacleSpeed;
+
+                // Check collision
+                if (
+                    player.x + player.size > obs.x &&
+                    player.x < obs.x + obs.width &&
+                    player.y + player.size / 2 > obs.y &&
+                    player.y - player.size / 2 < obs.y + obs.height
+                ) {
+                    resetGame();
+                    return; 
+                }
+
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(i, 1);
+                }
             }
         }
 
-        // --- DRAW OBSTACLES ---
-        function drawObstacles() {
-            ctx.fillStyle = obstacle.color;
-
-            // Top obstacle
-            ctx.fillRect(obstacle.x, 0, obstacle.width, obstacle.gapY);
-
-            // Bottom obstacle
-            const bottomObstacleY = obstacle.gapY + obstacle.gap;
-            const bottomObstacleHeight = canvas.height - bottomObstacleY;
-            ctx.fillRect(obstacle.x, bottomObstacleY, obstacle.width, bottomObstacleHeight);
-        }
-
+        // --- DRAW LOGIC ---
         function drawPlayer() {
             ctx.fillStyle = player.color;
             ctx.beginPath();
@@ -108,23 +155,44 @@
             ctx.fill();
         }
 
+        function drawObstacles() {
+            for (let obs of obstacles) {
+                ctx.fillStyle = obs.color;
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            }
+        }
+
+        function drawScoreboard() {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 18px sans-serif";
+            
+            // Draw current score on the top left
+            ctx.textAlign = "left";
+            ctx.fillText("SCORE: " + currentScore, 20, 30);
+            
+            // Draw high score on the top right
+            ctx.textAlign = "right";
+            ctx.fillText("HI-SCORE: " + highScore, canvas.width - 20, 30);
+        }
+
+        // --- GAME LOOP ---
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Update
-            updatePlayer();
-            updateObstacles();
+            // Update data
+            updateGame();
 
-            // Draw
+            // Render visual frames
             drawObstacles();
             drawPlayer();
+            drawScoreboard(); // Draw the text over the top of the gameplay
 
             requestAnimationFrame(gameLoop);
         }
 
+        // Start the game
         gameLoop();
     </script>
-
 
 </body>
 </html>
