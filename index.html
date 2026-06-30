@@ -23,28 +23,59 @@
 <body>
 
     <canvas id="gameCanvas" width="800" height="400"></canvas>
-
-       <script>
+    <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
         // --- PLAYER CONFIGURATION ---
         const player = {
-            x: 80,          // Position from the left
-            y: 200,         // Start in the middle vertically
-            size: 20,       // Size of the triangle
-            color: "#00ffcc" // Neon cyan color
+            x: 80,
+            y: 200,
+            size: 20,
+            color: "#00ffcc",
+            speed: 5 // How fast the player moves up/down
         };
 
-        // Function to draw the player as a triangle pointing right
+        // Track if the button/mouse is being pressed
+        let isPressed = false;
+
+        // --- INPUT LISTENERS ---
+        // Mouse/Touch controls
+        window.addEventListener("mousedown", () => isPressed = true);
+        window.addEventListener("mouseup", () => isPressed = false);
+        window.addEventListener("touchstart", () => isPressed = true);
+        window.addEventListener("touchend", () => isPressed = false);
+
+        // Keyboard controls (Spacebar)
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "Space") isPressed = true;
+        });
+        window.addEventListener("keyup", (e) => {
+            if (e.code === "Space") isPressed = false;
+        });
+
+        function updatePlayer() {
+            // If pressed, move UP. If not, move DOWN.
+            if (isPressed) {
+                player.y -= player.speed;
+            } else {
+                player.y += player.speed;
+            }
+
+            // Prevent player from leaving the screen (boundaries)
+            if (player.y < player.size) {
+                player.y = player.size;
+            }
+            if (player.y > canvas.height - player.size) {
+                player.y = canvas.height - player.size;
+            }
+        }
+
         function drawPlayer() {
             ctx.fillStyle = player.color;
             ctx.beginPath();
-            // Top point of the triangle
             ctx.moveTo(player.x, player.y - player.size / 2);
-            // Right point of the triangle
             ctx.lineTo(player.x + player.size, player.y);
-            // Bottom point of the triangle
             ctx.lineTo(player.x, player.y + player.size / 2);
             ctx.closePath();
             ctx.fill();
@@ -54,7 +85,10 @@
             // Clear the screen
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Draw the player
+            // Update positions
+            updatePlayer();
+
+            // Draw everything
             drawPlayer();
 
             requestAnimationFrame(gameLoop);
