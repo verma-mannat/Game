@@ -23,8 +23,7 @@
 <body>
 
     <canvas id="gameCanvas" width="800" height="400"></canvas>
-
-        <script>
+    <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
@@ -37,16 +36,13 @@
             speed: 5
         };
 
-        // --- OBSTACLE CONFIGURATION ---
-        const obstacle = {
-            x: canvas.width,    // Start off-screen on the right
-            width: 50,          // Width of the obstacles
-            gap: 120,           // Size of the gap to fly through
-            gapY: 150,          // Vertical position of the gap
-            speed: 4,           // Speed moving left
-            color: "#ff0055"    // Neon pink color
-        };
+        // --- OBSTACLE MANAGEMENT ---
+        let obstacles = [];
+        let obstacleTimer = 0;
+        const obstacleSpawnRate = 90; // Spawn an obstacle roughly every 90 frames (~1.5 seconds)
+        const obstacleSpeed = 4;
 
+        // Track if the button/mouse is being pressed
         let isPressed = false;
 
         // --- INPUT LISTENERS ---
@@ -54,6 +50,7 @@
         window.addEventListener("mouseup", () => isPressed = false);
         window.addEventListener("touchstart", () => isPressed = true);
         window.addEventListener("touchend", () => isPressed = false);
+
         window.addEventListener("keydown", (e) => {
             if (e.code === "Space") isPressed = true;
         });
@@ -61,43 +58,74 @@
             if (e.code === "Space") isPressed = false;
         });
 
-        function updatePlayer() {
+        // --- RESET FUNCTION ---
+        function resetGame() {
+            player.y = 200;
+            obstacles = [];
+            obstacleTimer = 0;
+            isPressed = false;
+        }
+
+        // --- UPDATE LOGIC ---
+        function updateGame() {
+            // 1. Move Player
             if (isPressed) {
                 player.y -= player.speed;
             } else {
                 player.y += player.speed;
             }
 
+            // Boundaries
             if (player.y < player.size) player.y = player.size;
             if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
-        }
 
-        // --- UPDATE OBSTACLES ---
-        function updateObstacles() {
-            // Move obstacle to the left
-            obstacle.x -= obstacle.speed;
+            // 2. Handle Obstacles Spawning
+            obstacleTimer++;
+            if (obstacleTimer >= obstacleSpawnRate) {
+                // Generate a random height for the obstacle wall/pillar
+                let minHeight = 40;
+                let maxHeight = 200;
+                let height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
+                
+                // Randomly choose if the obstacle spawns from the TOP or BOTTOM of the screen
+                let isTop = Math.random() < 0.5;
+                let yPosition = isTop ? 0 : canvas.height - height;
 
-            // If obstacle goes off-screen, reset it to the right with a new random gap position
-            if (obstacle.x + obstacle.width < 0) {
-                obstacle.x = canvas.width;
-                // Random gap height, keeping it away from the extreme edges
-                obstacle.gapY = Math.random() * (canvas.height - obstacle.gap - 100) + 50;
+                obstacles.push({
+                    x: canvas.width,
+                    y: yPosition,
+                    width: 30,
+                    height: height,
+                    color: "#ff4444" // Bright neon red/coral
+                });
+
+                obstacleTimer = 0; // Reset spawn timer
+            }
+
+            // 3. Move and Check Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                let obs = obstacles[i];
+                obs.x -= obstacleSpeed; // Move to the left
+
+                // Check collision with Player (Bounding box vs player coordinates approximation)
+                if (
+                    player.x + player.size > obs.x &&
+                    player.x < obs.x + obs.width &&
+                    player.y + player.size / 2 > obs.y &&
+                    player.y - player.size / 2 < obs.y + obs.height
+                ) {
+                    resetGame();
+                    return; // Stop updating this frame immediately on death
+                }
+
+                // Remove obstacle if it goes off-screen to save computer memory
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(i, 1);
+                }
             }
         }
 
-        // --- DRAW OBSTACLES ---
-        function drawObstacles() {
-            ctx.fillStyle = obstacle.color;
-
-            // Top obstacle
-            ctx.fillRect(obstacle.x, 0, obstacle.width, obstacle.gapY);
-
-            // Bottom obstacle
-            const bottomObstacleY = obstacle.gapY + obstacle.gap;
-            const bottomObstacleHeight = canvas.height - bottomObstacleY;
-            ctx.fillRect(obstacle.x, bottomObstacleY, obstacle.width, bottomObstacleHeight);
-        }
-
+        // --- DRAW LOGIC ---
         function drawPlayer() {
             ctx.fillStyle = player.color;
             ctx.beginPath();
@@ -108,23 +136,30 @@
             ctx.fill();
         }
 
+        function drawObstacles() {
+            for (let obs of obstacles) {
+                ctx.fillStyle = obs.color;
+                ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+            }
+        }
+
+        // --- GAME LOOP ---
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Update
-            updatePlayer();
-            updateObstacles();
+            // Update data
+            updateGame();
 
-            // Draw
+            // Render visual frames
             drawObstacles();
             drawPlayer();
 
             requestAnimationFrame(gameLoop);
         }
 
+        // Start the game
         gameLoop();
     </script>
-
 
 </body>
 </html>
