@@ -39,8 +39,14 @@
         // --- OBSTACLE MANAGEMENT ---
         let obstacles = [];
         let obstacleTimer = 0;
-        const obstacleSpawnRate = 90; // Spawn an obstacle roughly every 90 frames (~1.5 seconds)
+        const obstacleSpawnRate = 90; 
         const obstacleSpeed = 4;
+
+        // --- SCORE SYSTEM ---
+        let currentScore = 0;
+        // Check if a high score was saved before; if not, start at 0
+        let highScore = localStorage.getItem("spaceWavesHighScore") ? parseInt(localStorage.getItem("spaceWavesHighScore")) : 0;
+        let scoreTimer = 0; // Used to increment score over time
 
         // Track if the button/mouse is being pressed
         let isPressed = false;
@@ -60,9 +66,17 @@
 
         // --- RESET FUNCTION ---
         function resetGame() {
+            // Check if current score beat the high score before resetting
+            if (currentScore > highScore) {
+                highScore = currentScore;
+                localStorage.setItem("spaceWavesHighScore", highScore); // Save to browser memory!
+            }
+
             player.y = 200;
             obstacles = [];
             obstacleTimer = 0;
+            currentScore = 0; // Reset current score
+            scoreTimer = 0;
             isPressed = false;
         }
 
@@ -79,15 +93,20 @@
             if (player.y < player.size) player.y = player.size;
             if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
 
-            // 2. Handle Obstacles Spawning
+            // 2. Increment Score (Earn 1 point roughly every 10 frames (~0.16 seconds))
+            scoreTimer++;
+            if (scoreTimer >= 10) {
+                currentScore++;
+                scoreTimer = 0;
+            }
+
+            // 3. Handle Obstacles Spawning
             obstacleTimer++;
             if (obstacleTimer >= obstacleSpawnRate) {
-                // Generate a random height for the obstacle wall/pillar
                 let minHeight = 40;
                 let maxHeight = 200;
                 let height = Math.floor(Math.random() * (maxHeight - minHeight + 1)) + minHeight;
                 
-                // Randomly choose if the obstacle spawns from the TOP or BOTTOM of the screen
                 let isTop = Math.random() < 0.5;
                 let yPosition = isTop ? 0 : canvas.height - height;
 
@@ -96,18 +115,18 @@
                     y: yPosition,
                     width: 30,
                     height: height,
-                    color: "#ff4444" // Bright neon red/coral
+                    color: "#ff4444"
                 });
 
-                obstacleTimer = 0; // Reset spawn timer
+                obstacleTimer = 0;
             }
 
-            // 3. Move and Check Obstacles
+            // 4. Move and Check Obstacles
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 let obs = obstacles[i];
-                obs.x -= obstacleSpeed; // Move to the left
+                obs.x -= obstacleSpeed;
 
-                // Check collision with Player (Bounding box vs player coordinates approximation)
+                // Check collision
                 if (
                     player.x + player.size > obs.x &&
                     player.x < obs.x + obs.width &&
@@ -115,10 +134,9 @@
                     player.y - player.size / 2 < obs.y + obs.height
                 ) {
                     resetGame();
-                    return; // Stop updating this frame immediately on death
+                    return; 
                 }
 
-                // Remove obstacle if it goes off-screen to save computer memory
                 if (obs.x + obs.width < 0) {
                     obstacles.splice(i, 1);
                 }
@@ -143,6 +161,19 @@
             }
         }
 
+        function drawScoreboard() {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 18px sans-serif";
+            
+            // Draw current score on the top left
+            ctx.textAlign = "left";
+            ctx.fillText("SCORE: " + currentScore, 20, 30);
+            
+            // Draw high score on the top right
+            ctx.textAlign = "right";
+            ctx.fillText("HI-SCORE: " + highScore, canvas.width - 20, 30);
+        }
+
         // --- GAME LOOP ---
         function gameLoop() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -153,6 +184,7 @@
             // Render visual frames
             drawObstacles();
             drawPlayer();
+            drawScoreboard(); // Draw the text over the top of the gameplay
 
             requestAnimationFrame(gameLoop);
         }
